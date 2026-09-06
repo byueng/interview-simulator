@@ -1,0 +1,24 @@
+{
+  "question_bank_path": "path/to/your-question-bank",
+  "ui": {
+    "page_size": 15,
+    "theme": "dark",
+    "show_reference_after_scoring": false,
+    "keybindings": {
+      "select": "enter",
+      "previous_page": [
+        "left",
+        "pageup"
+      ],
+      "next_page": [
+        "right",
+        "pagedown"
+      ],
+      "quit": "q"
+    }
+  },
+  "scoring": {
+    "temperature": 0.9,
+    "feedback_style": "detailed_interviewer"
+  }
+}
