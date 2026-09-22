@@ -1,7 +1,7 @@
 # Interview Simulator
 
 > 面向技术岗位的本地 AI 模拟面试与复盘系统。支持题库选题、多轮追问、流式反馈、最终评分与本地练习记录。  
-> 当前版本：**v1.0.0 终端版**；当前已提供 **Agent 工程师赛道**，Web 端迁移计划见 [v1.0.0 版本记录](docs/releases/v1.0.0.md)。
+> 当前版本：**v1.1.0 本地 Web 增量**；当前已提供 **Agent 工程师赛道**。终端基线与迁移边界见 [v1.0.0 版本记录](docs/releases/v1.0.0.md)，本次增量见 [v1.1.0](docs/releases/v1.1.0.md)。
 
 ## 功能概览
 
@@ -11,12 +11,14 @@
 - 基于 OpenAI-compatible Chat Completions 接入模型，获得追问与最终评价。
 - 模型结果通过 SSE 增量展示；完整 JSON 校验成功后才写入 SQLite。
 - 将会话、轮次、评分和题目练习进度保存到本地。
+- 提供浏览器原生中英文作答框：以本地 Web 页复用既有 API、SSE 和 SQLite，不需要 Textual 输入。
+- `scoring.feedback_style` 已接入模型提示词，可在 `detailed_interviewer` 与 `pressure_interviewer` 之间选择；高压模式只追问技术证据和边界，禁止羞辱或虚构回答。
 
 ## 架构
 
 ```mermaid
 flowchart LR
-    A[Textual TUI] --> B[本地 FastAPI]
+    A[Textual TUI / 本地 Web] --> B[本地 FastAPI]
     B --> C[InterviewService]
     C --> D[OpenAI-compatible LLM]
     C --> E[(SQLite)]
@@ -74,6 +76,15 @@ uv run interview-simulator --inspect
 uv run interview-simulator
 ```
 
+启动浏览器面试页（推荐 macOS 中文输入法使用）：
+
+```bash
+cd web-v2 && npm ci && npm run build && cd ..
+uv run interview-simulator --web
+```
+
+首行会将 Vue 前端打包到本地未跟踪目录；之后命令会打印本机地址。在浏览器打开该地址，按 `Ctrl+C` 停止服务。它仅绑定 `127.0.0.1`，不对局域网公开。开发页面时，可先运行 `uv run interview-simulator --web --port 8000`，再在另一个终端运行 `cd web-v2 && npm run dev`；Vite 默认将 `/questions`、`/sessions` 请求代理到 `127.0.0.1:8000`，也可用 `VITE_API_BASE_URL` 指向其他 API 地址。
+
 ## 使用流程
 
 1. 在题库列表中选择题目，查看模块、难度和练习状态。
@@ -116,7 +127,7 @@ your-question-bank/
 | `question_bank_path` | 本地 Markdown 题库目录 |
 | `ui.page_size` | 每页题目数量，默认 15 |
 | `scoring.temperature` | 模型生成温度，默认 0.9 |
-| `scoring.feedback_style` | 预留的评分风格字段；v1.0 尚未接入模型提示词 |
+| `scoring.feedback_style` | `detailed_interviewer`（默认）或 `pressure_interviewer`；两者都要求评价对应实际回答 |
 
 ## 本地 API
 
@@ -137,12 +148,12 @@ your-question-bank/
 uv run --all-extras pytest -p no:cacheprovider --disable-warnings -v
 ```
 
-截至 v1.0.0 的最新本地验证：**36 passed, 1 warning**。模型请求和 SSE 解析使用 `httpx.MockTransport` 测试；这不等同于已经完成你所选模型供应商的真实端到端验收。
+截至 v1.0.0 的历史验证为 **36 passed, 1 warning**。模型请求和 SSE 解析使用 `httpx.MockTransport` 测试；这不等同于已经完成你所选模型供应商的真实端到端验收。v1.1 的验证结果以本次提交后的测试记录为准。
 
 ## 已知限制
 
 - 当前是单用户、本地 SQLite、临时本机 FastAPI 端口的终端版实现。
-- macOS + iTerm2 + Textual `TextArea` 下，直接中文输入的拼音候选词存在兼容问题；中文粘贴可用，普通终端输入入口是临时绕过方案。
+- macOS + iTerm2 + Textual `TextArea` 下，直接中文输入的拼音候选词存在兼容问题；浏览器本地 Web 页使用原生输入框作为可用替代表现层，Textual 本身并未修复。
 - 长会话尚未实现 token 预算、摘要压缩或会话恢复。
 - 评分的严格程度仍受模型输出影响，尚未有独立评测集或人工校准流程。
 - 当前没有账户、权限、并发控制、远程部署或任务取消能力。
@@ -158,12 +169,16 @@ uv run --all-extras pytest -p no:cacheprovider --disable-warnings -v
 - [x] 本地 FastAPI、SSE、SQLite
 - [x] OpenAI-compatible 模型适配
 
-### v2.0.0：Web Migration
+### v1.1.0：本地 Web 增量
 
-- [ ] 浏览器原生中英文输入框
-- [ ] Web 题库、作答、流式反馈与评分页面
+- [x] 浏览器原生中英文输入框
+- [x] Web 题库、作答、流式反馈与评分页面
+- [x] 将评分风格接入提示词，并限制为可审计的预设
+
+### v2.0.0：Web 迁移完善
+
 - [ ] 刷新后会话恢复与流中断提示
-- [ ] 将评分风格真正接入提示词，并用固定样例回归验证
+- [ ] 用固定样例校准不同评分风格
 - [ ] 根据多用户需求评估 PostgreSQL、认证与观测能力
 
 ## 贡献与安全

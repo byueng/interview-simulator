@@ -8,3 +8,4 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.egg-info/
+web-v2/dist/

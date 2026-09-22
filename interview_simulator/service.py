@@ -27,8 +27,15 @@ class InterviewService:
 
     async def create_session(self, question_id: str, mode: str) -> Session:
         question = self.bank.get(question_id)
-        session = self.storage.create_session(question.id, mode, question.source_hash, question.title)
-        get_logger().info("session_created question_id=%s mode=%s", session.question_id, session.mode)
+        session = self.storage.create_session(
+            question.id, question.knowledge_id, mode, question.source_hash, question.title
+        )
+        get_logger().info(
+            "session_created question_id=%s knowledge_id=%s mode=%s",
+            session.question_id,
+            session.knowledge_id,
+            session.mode,
+        )
         return session
 
     async def submit_answer(self, session_id: str, answer: str) -> SubmitResult:

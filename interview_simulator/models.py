@@ -7,12 +7,19 @@ from typing import Any
 
 @dataclass(frozen=True, slots=True)
 class Question:
-    """题库中的单个只读 Markdown 题目。"""
+    """知识库中的单个只读 Markdown 条目。"""
 
     id: str
+    knowledge_id: str
+    bank_id: str
     title: str
     module: str
     difficulty: str
+    kind: str
+    tags: tuple[str, ...]
+    prerequisites: tuple[str, ...]
+    revision: int
+    status: str
     relative_path: str
     source_hash: str
     reference_markdown: str
@@ -32,6 +39,7 @@ class Turn:
 class Session:
     id: str
     question_id: str
+    knowledge_id: str
     mode: str
     source_hash: str
     title: str

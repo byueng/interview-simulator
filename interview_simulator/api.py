@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import time
 import json
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from interview_simulator.logging_config import get_logger
@@ -25,8 +27,18 @@ class SubmitTurnRequest(BaseModel):
 
 
 def create_app(service: InterviewService, bank: QuestionBank, storage: SQLiteStorage) -> FastAPI:
-    app = FastAPI(title="Interview Simulator Local API", version="1.0.0")
+    app = FastAPI(title="Interview Simulator Local API", version="1.1.0")
     logger = get_logger()
+    legacy_static_directory = Path(__file__).parent / "static"
+    vue_distribution = Path(__file__).parents[1] / "web-v2" / "dist"
+    web_client_directory = vue_distribution if (vue_distribution / "index.html").is_file() else legacy_static_directory
+    app.mount("/static", StaticFiles(directory=legacy_static_directory), name="legacy-static")
+    if web_client_directory == vue_distribution:
+        app.mount("/assets", StaticFiles(directory=vue_distribution / "assets"), name="web-assets")
+
+    @app.get("/", include_in_schema=False)
+    def web_client() -> FileResponse:
+        return FileResponse(web_client_directory / "index.html")
 
     @app.middleware("http")
     async def log_request(request: Request, call_next: Any) -> Any:
@@ -145,9 +157,16 @@ def _question_payload(question: Any, storage: SQLiteStorage) -> dict[str, Any]:
     progress = storage.latest_progress(question.id)
     return {
         "id": question.id,
+        "knowledge_id": question.knowledge_id,
+        "bank_id": question.bank_id,
         "title": question.title,
         "module": question.module,
         "difficulty": question.difficulty,
+        "kind": question.kind,
+        "tags": question.tags,
+        "prerequisites": question.prerequisites,
+        "revision": question.revision,
+        "knowledge_status": question.status,
         "relative_path": question.relative_path,
         "practiced": progress is not None and progress.practiced,
         "latest_score": progress.latest_score if progress else None,
@@ -173,9 +192,11 @@ def _session_payload(session: Session, *, include_turns: bool) -> dict[str, Any]
     payload: dict[str, Any] = {
         "id": session.id,
         "question_id": session.question_id,
+        "knowledge_id": session.knowledge_id,
         "mode": session.mode,
         "title": session.title,
         "status": session.status,
+        "current_question": session.current_question,
         "started_at": session.started_at,
         "ended_at": session.ended_at,
         "final_score": session.final_score,

@@ -34,6 +34,7 @@ class SQLiteStorage:
                 CREATE TABLE IF NOT EXISTS interview_sessions (
                     id TEXT PRIMARY KEY,
                     question_id TEXT NOT NULL,
+                    knowledge_id TEXT,
                     mode TEXT NOT NULL CHECK (mode IN ('single', 'deep')),
                     source_hash TEXT NOT NULL,
                     title TEXT NOT NULL,
@@ -61,13 +62,22 @@ class SQLiteStorage:
                     ON interview_turns(session_id, round_no ASC);
                 """
             )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(interview_sessions)")}
+            if "knowledge_id" not in columns:
+                connection.execute("ALTER TABLE interview_sessions ADD COLUMN knowledge_id TEXT")
+            connection.execute(
+                "UPDATE interview_sessions SET knowledge_id = question_id WHERE knowledge_id IS NULL OR knowledge_id = ''"
+            )
 
-    def create_session(self, question_id: str, mode: str, source_hash: str, title: str) -> Session:
+    def create_session(
+        self, question_id: str, knowledge_id: str, mode: str, source_hash: str, title: str
+    ) -> Session:
         if mode not in {"single", "deep"}:
             raise ValueError("mode 必须是 single 或 deep")
         session = Session(
             id=str(uuid.uuid4()),
             question_id=question_id,
+            knowledge_id=knowledge_id,
             mode=mode,
             source_hash=source_hash,
             title=title,
@@ -82,12 +92,13 @@ class SQLiteStorage:
             connection.execute(
                 """
                 INSERT INTO interview_sessions
-                    (id, question_id, mode, source_hash, title, current_question, status, started_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, question_id, knowledge_id, mode, source_hash, title, current_question, status, started_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
                     session.question_id,
+                    session.knowledge_id,
                     session.mode,
                     session.source_hash,
                     session.title,
@@ -174,8 +185,6 @@ class SQLiteStorage:
             latest_score=row["final_score"],
             latest_practiced_at=row["ended_at"],
         )
-
-
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -196,6 +205,7 @@ def _session_from_row(row: sqlite3.Row, turns: tuple[Turn, ...]) -> Session:
     return Session(
         id=row["id"],
         question_id=row["question_id"],
+        knowledge_id=row["knowledge_id"] or row["question_id"],
         mode=row["mode"],
         source_hash=row["source_hash"],
         title=row["title"],

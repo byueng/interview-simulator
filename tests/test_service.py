@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from datetime import datetime
 
 from interview_simulator.models import FinalEvaluation, InterviewReply
 from interview_simulator.logging_config import configure_logging
@@ -106,8 +107,9 @@ async def test_single_session_ends_after_its_first_answer(
     assert result.ended is True
     assert interviewer.follow_up_calls == 0
     assert interviewer.evaluate_calls == 1
-    log_text = (tmp_path / "logs" / "interview-simulator.log").read_text(encoding="utf-8")
-    assert "session_created question_id=006 mode=single" in log_text
+    log_path = tmp_path / "logs" / f"{datetime.now().astimezone().date().isoformat()}.log"
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "session_created question_id=006 knowledge_id=" in log_text
     assert "session_finished question_id=006 score=6.5" in log_text
 
 

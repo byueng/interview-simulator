@@ -40,6 +40,17 @@ def test_load_config_rejects_page_size_below_one(tmp_path: Path) -> None:
         AppConfig.load(config_file)
 
 
+def test_load_config_rejects_unknown_feedback_style(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        json.dumps({"question_bank_path": "/tmp/question-bank", "scoring": {"feedback_style": "mean"}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="feedback_style"):
+        AppConfig.load(config_file)
+
+
 def test_public_config_example_is_loadable() -> None:
     project_root = Path(__file__).parent.parent
 

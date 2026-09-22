@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -51,7 +52,19 @@ def test_questions_endpoint_returns_page_metadata_and_progress(client: TestClien
     assert payload["page_size"] == 15
     assert payload["total"] == 1
     assert payload["items"][0]["id"] == "022"
+    assert payload["items"][0]["knowledge_id"].endswith(":022")
+    assert payload["items"][0]["tags"] == []
     assert payload["items"][0]["practiced"] is False
+
+
+def test_web_client_and_static_assets_are_available(client: TestClient) -> None:
+    page = client.get("/")
+    script = client.get("/static/app.js")
+
+    assert page.status_code == 200
+    assert "模拟面试" in page.text
+    assert script.status_code == 200
+    assert "startSession" in script.text
 
 
 def test_single_session_ends_after_one_answer_and_updates_progress(client: TestClient) -> None:
@@ -65,6 +78,8 @@ def test_single_session_ends_after_one_answer_and_updates_progress(client: TestC
     assert result.status_code == 200
     assert result.json()["ended"] is True
     assert result.json()["evaluation"]["score"] == 7.0
+    assert result.json()["session"]["current_question"] is None
+    assert result.json()["session"]["knowledge_id"].endswith(":022")
     assert questions.json()["items"][0]["latest_score"] == 7.0
 
 
@@ -100,7 +115,8 @@ def test_api_request_writes_method_path_status_and_duration_to_backend_log(tmp_p
 
     response = TestClient(app).get("/health")
 
-    log_text = (tmp_path / "logs" / "interview-simulator.log").read_text(encoding="utf-8")
+    log_path = tmp_path / "logs" / f"{datetime.now().astimezone().date().isoformat()}.log"
+    log_text = log_path.read_text(encoding="utf-8")
     assert response.status_code == 200
     assert "GET /health status=200" in log_text
     assert "duration_ms=" in log_text

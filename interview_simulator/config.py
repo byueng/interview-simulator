@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+SUPPORTED_FEEDBACK_STYLES = frozenset({"detailed_interviewer", "pressure_interviewer"})
+
+
 class ConfigError(ValueError):
     """用户配置无法安全使用。"""
 
@@ -81,4 +84,7 @@ class AppConfig:
         feedback_style = raw.get("feedback_style", "detailed_interviewer")
         if not isinstance(feedback_style, str) or not feedback_style:
             raise ConfigError("scoring.feedback_style 必须是非空字符串")
+        if feedback_style not in SUPPORTED_FEEDBACK_STYLES:
+            supported = "、".join(sorted(SUPPORTED_FEEDBACK_STYLES))
+            raise ConfigError(f"scoring.feedback_style 仅支持：{supported}")
         return ScoringConfig(float(temperature), feedback_style)

@@ -20,6 +20,18 @@ class ModelResponseError(RuntimeError):
     """模型服务失败，或未返回程序可用的结构化内容。"""
 
 
+_FEEDBACK_STYLE_INSTRUCTIONS = {
+    "detailed_interviewer": (
+        "保持严谨、详细、直接的面试反馈：优点、错误与建议都要对应候选人的实际回答，"
+        "不要用泛泛鼓励替代技术判断。"
+    ),
+    "pressure_interviewer": (
+        "保持高压但专业的面试节奏：逐项追问未被证明的结论、缺失的边界与取舍，"
+        "要求候选人用可验证的技术细节说明；不得羞辱、人身攻击或虚构候选人说过的话。"
+    ),
+}
+
+
 @dataclass(frozen=True, slots=True)
 class ModelSettings:
     base_url: str
@@ -49,10 +61,16 @@ class OpenAICompatibleInterviewer:
         settings: ModelSettings,
         *,
         temperature: float,
+        feedback_style: str = "detailed_interviewer",
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.settings = settings
         self.temperature = temperature
+        try:
+            self.feedback_style_instruction = _FEEDBACK_STYLE_INSTRUCTIONS[feedback_style]
+        except KeyError as exc:
+            supported = "、".join(sorted(_FEEDBACK_STYLE_INSTRUCTIONS))
+            raise ValueError(f"不支持的评分风格：{feedback_style}；仅支持：{supported}") from exc
         self.transport = transport
 
     async def follow_up(self, *, question: Question, transcript: list[Turn]) -> InterviewReply:
@@ -61,6 +79,7 @@ class OpenAICompatibleInterviewer:
                 "你是一位高标准的中文 AI Agent 工程师面试官。基于候选人的真实回答和题库参考内容，"
                 "直接指出技术错误、缺失的工程边界或空泛之处，再只提出一个能继续下钻的问题。"
                 "不得虚构候选人说过的内容，也不得给泛泛鼓励。"
+                f"{self.feedback_style_instruction}"
             ),
             user=(
                 f"题目：{question.title}\n模块：{question.module}\n难度：{question.difficulty}\n\n"
@@ -83,6 +102,7 @@ class OpenAICompatibleInterviewer:
                 "你是一位高标准的中文 AI Agent 工程师面试官。基于候选人的真实回答和题库参考内容，"
                 "直接指出技术错误、缺失的工程边界或空泛之处，再只提出一个能继续下钻的问题。"
                 "不得虚构候选人说过的内容，也不得给泛泛鼓励。"
+                f"{self.feedback_style_instruction}"
             ),
             user=(
                 f"题目：{question.title}\n模块：{question.module}\n难度：{question.difficulty}\n\n"
@@ -108,7 +128,7 @@ class OpenAICompatibleInterviewer:
                 "你是一位高标准的中文 AI Agent 工程师面试官。请对整场面试给中肯且详细的最终评价。"
                 "优点必须对应候选人的原话；没有提到的工程能力不得补分；错误和模糊表达要明确说明。"
                 "分数为 0 到 10，可使用 0.5；4 分表示基本表达，7 分以上要求工程实现，"
-                "8 分以上要求工程边界与取舍。"
+                f"8 分以上要求工程边界与取舍。{self.feedback_style_instruction}"
             ),
             user=(
                 f"原题：{question.title}\n\n参考解析：\n{question.reference_markdown}\n\n"
@@ -131,7 +151,7 @@ class OpenAICompatibleInterviewer:
                 "你是一位高标准的中文 AI Agent 工程师面试官。请对整场面试给中肯且详细的最终评价。"
                 "优点必须对应候选人的原话；没有提到的工程能力不得补分；错误和模糊表达要明确说明。"
                 "分数为 0 到 10，可使用 0.5；4 分表示基本表达，7 分以上要求工程实现，"
-                "8 分以上要求工程边界与取舍。"
+                f"8 分以上要求工程边界与取舍。{self.feedback_style_instruction}"
             ),
             user=(
                 f"原题：{question.title}\n\n参考解析：\n{question.reference_markdown}\n\n"
@@ -214,9 +234,12 @@ class OpenAICompatibleInterviewer:
                             continue
                         try:
                             payload = json.loads(data)
-                            content = payload["choices"][0]["delta"].get("content")
+                            choices = payload.get("choices")
+                            if choices == []:
+                                continue
+                            content = choices[0]["delta"].get("content")
                         except (KeyError, IndexError, TypeError, ValueError) as exc:
-                            raise ModelResponseError("模型流式响应缺少 choices[0].delta.content") from exc
+                            raise ModelResponseError("模型流式响应 choices/delta 格式不正确") from exc
                         if content is None:
                             continue
                         if not isinstance(content, str):

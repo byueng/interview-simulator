@@ -54,16 +54,20 @@ def build_runtime(
     bank = QuestionBank.scan(config.question_bank_path)
     storage = SQLiteStorage(database_path)
     model_settings = ModelSettings.from_env_file(env_path)
-    interviewer = OpenAICompatibleInterviewer(model_settings, temperature=config.scoring.temperature)
+    interviewer = OpenAICompatibleInterviewer(
+        model_settings,
+        temperature=config.scoring.temperature,
+        feedback_style=config.scoring.feedback_style,
+    )
     service = InterviewService(bank, storage, interviewer)
     logger.info("runtime_initialized questions=%s", len(bank.questions))
     return Runtime(config, bank, storage, service, create_app(service, bank, storage))
 
 
-def start_local_server(app: FastAPI) -> RunningServer:
+def start_local_server(app: FastAPI, *, port: int = 0) -> RunningServer:
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listener.bind(("127.0.0.1", 0))
+    listener.bind(("127.0.0.1", port))
     listener.listen(128)
     port = listener.getsockname()[1]
     config = uvicorn.Config(app, log_level="warning", access_log=False)

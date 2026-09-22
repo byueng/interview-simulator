@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Interview Simulator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header>
+      <div><p class="eyebrow">LOCAL AI INTERVIEW PRACTICE</p><h1>模拟面试</h1></div>
+      <p id="connection-status" class="status">正在连接本地服务…</p>
+    </header>
+    <main>
+      <aside class="panel question-panel">
+        <div class="panel-heading"><h2>题库</h2><button id="reload-questions" class="text-button">刷新</button></div>
+        <div id="question-list" class="question-list" aria-live="polite"></div>
+      </aside>
+      <section class="panel interview-panel">
+        <div id="empty-state" class="empty-state">
+          <p class="eyebrow">选择一题开始</p><h2>用原生输入框完成一次真实的技术作答。</h2>
+          <p>选择题目后，可进行单题评分或最多 10 轮的深入追问。反馈只在模型返回完整、可校验结果后写入本地记录。</p>
+        </div>
+        <div id="interview-state" hidden>
+          <div class="session-heading"><div><p id="question-meta" class="eyebrow"></p><h2 id="question-title"></h2></div><span id="mode-label" class="pill"></span></div>
+          <div id="transcript" class="transcript" aria-live="polite"></div>
+          <section class="answer-box"><label id="prompt-label" for="answer">请作答</label><textarea id="answer" rows="7" placeholder="可直接使用中文或英文输入法；Ctrl / ⌘ + Enter 提交"></textarea><div class="answer-actions"><span id="submit-status"></span><button id="finish-session" class="secondary-button">结束并评分</button><button id="submit-answer">提交回答</button></div></section>
+          <section id="evaluation" class="evaluation" hidden></section>
+        </div>
+      </section>
+    </main>
+    <dialog id="mode-dialog"><form method="dialog"><p class="eyebrow">开始练习</p><h2 id="dialog-question-title"></h2><p>单题评分会在第一次回答后给出评分；深入面试会继续追问，最多 10 轮。</p><menu><button value="cancel" class="secondary-button">取消</button><button id="deep-mode" value="deep">深入面试</button><button id="single-mode" value="single">单题评分</button></menu></form></dialog>
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

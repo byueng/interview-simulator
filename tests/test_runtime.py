@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -55,4 +56,5 @@ def test_build_runtime_composes_bank_storage_interviewer_and_fastapi(tmp_path: P
     assert runtime.bank.get("006").title == "如何控制 Agent Loop？"
     assert runtime.storage.database_path.exists()
     assert runtime.app.title == "Interview Simulator Local API"
-    assert "runtime_initialized questions=1" in (log_directory / "interview-simulator.log").read_text(encoding="utf-8")
+    log_path = log_directory / f"{datetime.now().astimezone().date().isoformat()}.log"
+    assert "runtime_initialized questions=1" in log_path.read_text(encoding="utf-8")

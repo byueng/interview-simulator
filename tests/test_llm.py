@@ -6,6 +6,7 @@ from typing import AsyncIterator
 
 import httpx
 import pytest
+from datetime import datetime
 
 from interview_simulator.logging_config import configure_logging
 from interview_simulator.llm import ModelResponseError, ModelSettings, OpenAICompatibleInterviewer
@@ -27,9 +28,16 @@ class SseStream(httpx.AsyncByteStream):
 def question() -> Question:
     return Question(
         id="006",
+        knowledge_id="test-bank:agent-architecture:006-agent-loop",
+        bank_id="test-bank",
         title="如何控制 Agent Loop？",
         module="Agent 架构",
         difficulty="中级",
+        kind="concept",
+        tags=("agent", "loop"),
+        prerequisites=(),
+        revision=1,
+        status="published",
         relative_path="01-agent-architecture/006-agent-loop.md",
         source_hash="hash",
         reference_markdown="# 如何控制 Agent Loop？\n\n使用 max_steps 与状态机。",
@@ -86,6 +94,25 @@ async def test_evaluate_parses_detailed_chinese_scorecard() -> None:
     assert evaluation.issues == ["没有失败状态"]
 
 
+async def test_pressure_interviewer_style_is_included_in_model_system_prompt() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        system = json.loads(request.content)["messages"][0]["content"]
+        assert "高压但专业" in system
+        assert "不得羞辱" in system
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"feedback": "需要边界。", "next_question": "如何验证？"})}}]})
+
+    interviewer = OpenAICompatibleInterviewer(
+        ModelSettings("https://example.test/v1", "test-key", "test-model"),
+        temperature=0.9,
+        feedback_style="pressure_interviewer",
+        transport=httpx.MockTransport(handler),
+    )
+
+    reply = await interviewer.follow_up(question=question(), transcript=[])
+
+    assert reply.next_question == "如何验证？"
+
+
 def test_model_settings_reads_only_expected_env_names(tmp_path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("LLM_BASE_URL=https://example.test/v1\nLLM_API_KEY=test-key\nLLM_MODEL=test-model\n", encoding="utf-8")
@@ -111,7 +138,8 @@ async def test_model_http_failure_is_logged_without_api_key(tmp_path: Path) -> N
     with pytest.raises(ModelResponseError, match="HTTP 401"):
         await interviewer.follow_up(question=question(), transcript=[])
 
-    log_text = (tmp_path / "logs" / "interview-simulator.log").read_text(encoding="utf-8")
+    log_path = tmp_path / "logs" / f"{datetime.now().astimezone().date().isoformat()}.log"
+    log_text = log_path.read_text(encoding="utf-8")
     assert "model_request failed status=401" in log_text
     assert "super-secret-key" not in log_text
 
@@ -129,6 +157,7 @@ async def test_follow_up_streams_sse_deltas_then_a_validated_reply() -> None:
             f"data: {json.dumps({'choices': [{'delta': {'content': text}}]}, ensure_ascii=False)}\n\n".encode("utf-8")
             for text in text_chunks
         ]
+        sse_chunks.insert(1, b'data: {"choices": [], "usage": {"total_tokens": 12}}\n\n')
         sse_chunks.append(b"data: [DONE]\n\n")
         return httpx.Response(200, stream=SseStream(sse_chunks))
 
